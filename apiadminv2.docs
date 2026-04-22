@@ -1,0 +1,3903 @@
+openapi: 3.0.1
+info:
+  version: 2.0.0
+  title: Admin API
+  description: >-
+    <h3>Rate limits</h3> <p>The REST Admin API v2 supports a limit of 5 requests
+    per panel per second.</p>  <p>Past the limit, the API will return a 429 Too
+    Many Requests error.</p>
+servers:
+  - url: 'https://getDomain()/adminapi/v2'
+    description: API server
+security:
+  - ApiKeyAuth: []
+paths:
+  /orders/pull:
+    post:
+      tags:
+        - Orders
+      summary: Pull orders
+      description: >
+        Use this method to get Pending orders for manual services and
+        automatically update their status to Processing after a successful
+        request.
+
+        > **Note**: The method gives and processes only manual orders for the
+        **last 90 days**.
+      responses:
+        '200':
+          $ref: '#/components/responses/PullOrders'
+        '400':
+          $ref: '#/components/responses/PullOrdersValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_ids:
+                  type: string
+                  description: >-
+                    Use it to get only orders specified by a comma-separated
+                    list of service IDs.
+                  example: '2,34,55'
+                limit:
+                  type: integer
+                  description: Maximum number of returned orders.
+                  default: 100
+                  maximum: 100
+                  example: 10
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: Get order list
+      description: >
+        Use this call to search and get a list of orders according to the
+        filters described below.
+
+        > **Note**: By default, the method gives only orders for the **last 90
+        days**, except when **ids** or **external_order_ids** parameters are
+        used or another period is selected in the parameters **created_from**
+        and **created_to**.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetOrderList'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - name: ids
+          description: >
+            Use it to get multiple orders specified by a comma-separated list of
+            order IDs.
+
+            > If you need to get one order by ID - use the Get order method.
+          in: query
+          required: false
+          example: '12,33,46'
+          schema:
+            type: string
+        - name: external_order_ids
+          description: >-
+            Use it to get one or multiple orders specified by external
+            (provider’s) order ID.
+          in: query
+          required: false
+          example: '123e4567-e89b, xx34d5, 55'
+          schema:
+            type: string
+        - name: created_from
+          description: Order creation UNIX timestamp (lower bound).
+          in: query
+          required: false
+          example: 1447804800
+          schema:
+            type: integer
+            default: 90 days from today
+        - name: created_to
+          description: Order creation UNIX timestamp (upper bound).
+          in: query
+          required: false
+          example: 1450448972
+          schema:
+            type: integer
+            default: The current day and time at the time the request is sent
+        - name: order_status
+          description: Use it to filter orders by their status.
+          in: query
+          required: false
+          example: pending
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: mode
+          description: Use it to filter orders by their mode.
+          in: query
+          required: false
+          example: manual
+          schema:
+            $ref: '#/components/schemas/OrderMode'
+        - name: service_ids
+          description: >-
+            Use it to get only orders specified by a comma-separated list of
+            service IDs.
+          in: query
+          required: false
+          example: '123,556,765'
+          schema:
+            type: string
+        - name: creation_type
+          description: Use it to filter orders by their creation type.
+          in: query
+          required: false
+          example: subscription
+          schema:
+            $ref: '#/components/schemas/OrderCreationType'
+        - name: user
+          description: Use it to get orders created by certain user.
+          in: query
+          required: false
+          example: alex
+          schema:
+            type: string
+        - name: provider
+          description: Use it to get orders of certain provider by provider URL or alias.
+          in: query
+          required: false
+          example: example.com
+          schema:
+            type: string
+        - name: ip_address
+          description: Use it to get orders created from certain IP address.
+          in: query
+          required: false
+          example: 222.333.444.555
+          schema:
+            type: string
+        - name: link
+          description: Use it to get orders specified by link.
+          in: query
+          required: false
+          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: Offset from the beginning of the returned items list (for paging).
+          required: false
+          example: 10
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          description: Maximum number of returned orders.
+          in: query
+          required: false
+          example: 10
+          schema:
+            type: integer
+            maximum: 1000
+            default: 100
+        - name: sort
+          description: Use it to sort orders by their created date.
+          in: query
+          required: false
+          example: date-asc
+          schema:
+            description: Order sort type
+            type: string
+            default: date-desc
+            enum:
+              - date-desc
+              - date-asc
+  '/orders/{order_id}':
+    get:
+      tags:
+        - Orders
+      summary: Get order
+      description: >-
+        Use this call to get all available information about an order referring
+        to its ID.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetOrder'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - in: path
+          name: order_id
+          description: Order ID
+          required: true
+          schema:
+            type: integer
+          example: 255
+  /orders/update:
+    post:
+      tags:
+        - Orders
+      summary: Update orders
+      description: >
+        Use this call to update statuses, start count or remains of one or
+        multiple orders.
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orders
+              properties:
+                orders:
+                  type: array
+                  maxItems: 100
+                  description: Array of orders to update. Maximum 100 orders per request.
+                  items:
+                    type: object
+                    required:
+                      - id
+                    properties:
+                      id:
+                        type: integer
+                        description: The unique identifier of the order
+                        example: 12
+                      status:
+                        type: string
+                        description: Order status to be changed to
+                        example: processing
+                        enum:
+                          - pending
+                          - in_progress
+                          - processing
+                          - canceled
+                          - partial
+                          - completed
+                      remains:
+                        type: integer
+                        description: >
+                          Use this field to update the remains for an order.
+
+                          This field is required when setting the status to
+                          **Partial.**
+                        example: 544
+                      start_count:
+                        type: integer
+                        description: Use it to set start count value for an order
+                        minimum: 0
+                        example: 124
+                      cancel_reason:
+                        type: string
+                        description: |
+                          Use it to add a cancel reason for canceled orders.
+                        maxLength: 1000
+                        example: Incorrect link
+      responses:
+        '200':
+          $ref: '#/components/responses/OrdersUpdateResponse'
+        '400':
+          $ref: '#/components/responses/OrdersUpdateValidationError'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error_message:
+                    type: string
+                    example: Order not found
+                  error_code:
+                    type: integer
+                    example: 404
+  '/orders/{order_id}/edit-link':
+    post:
+      tags:
+        - Orders
+      summary: Edit order link
+      description: Use this call to change the order link referring to its ID.
+      responses:
+        '200':
+          $ref: '#/components/responses/EditLink'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - in: path
+          name: order_id
+          description: Order ID
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 255
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                link:
+                  type: string
+                  description: Updated order link
+                  example: 'https://www.instagram.com/p/CnSqOBDrrCp/'
+  /orders/resend:
+    post:
+      tags:
+        - Orders
+      summary: Resend order
+      description: >-
+        Use this call to resend one or more Fail orders. You could use Get order
+        list, Get order methods to check if the Resend option is available for
+        orders.
+      responses:
+        '200':
+          $ref: '#/components/responses/Resend'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: string
+                  description: >-
+                    The unique identifier of the order. Use it to resend one or
+                    multiple orders specified by a comma-separated list of order
+                    IDs. Maximum 100 IDs per request.
+                  example: '2,34,55'
+  /orders/change-status:
+    post:
+      tags:
+        - Orders
+      summary: Change status
+      description: Use this call to change status of one or more orders.
+      responses:
+        '200':
+          $ref: '#/components/responses/ChangeStatus'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/OrderNotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+                - status
+              properties:
+                ids:
+                  type: string
+                  required: true
+                  description: >-
+                    The unique identifier of the order. Use this parameter to
+                    update one or multiple orders specified by a comma-separated
+                    list of order IDs. Maximum 100 IDs per request.
+                  example: '12,15,30,33,46'
+                status:
+                  type: string
+                  required: true
+                  description: Order status to be changed to.
+                  example: processing
+                  enum:
+                    - pending
+                    - in_progress
+                    - processing
+                    - completed
+  '/orders/{order_id}/set-partial':
+    post:
+      tags:
+        - Orders
+      summary: Set partial
+      description: Use this call to set partial for an order referring to its ID.
+      responses:
+        '200':
+          $ref: '#/components/responses/SetPartial'
+        '400':
+          $ref: '#/components/responses/ValidationErrorSetPartial'
+        '404':
+          $ref: '#/components/responses/SetPartialNotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - in: path
+          name: order_id
+          description: The unique identifier of the order.
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 58
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+                - remains
+              properties:
+                remains:
+                  type: integer
+                  description: Order remains. The quantity left to fulfill the order.
+                  example: 544
+                  required: true
+  /orders/request-cancel:
+    post:
+      tags:
+        - Orders
+      summary: Request cancel
+      description: >-
+        Use this call to request order cancellations and create the ‘Cancel’
+        task. This call allows you to send cancel requests for orders where the
+        ‘Cancel’ button is available to the user.
+      responses:
+        '200':
+          $ref: '#/components/responses/RequestCancel'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/OrderNotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: string
+                  required: true
+                  description: >-
+                    The unique identifier of the order. Use this parameter to
+                    request cancellations of one or multiple orders, specified
+                    by a comma-separated list of order IDs. Maximum 100 IDs per
+                    request.
+                  example: '12,15,30,33,46'
+  /cancel/pull:
+    post:
+      tags:
+        - Cancel
+      summary: Pull cancel tasks
+      description: >
+        Use this call to get one or more Pending ‘Cancel’ tasks for manual
+        services and update their status to ‘Awaiting’.
+
+        > **Note**: The method gives and processes only manual Cancel tasks for
+        the **last 90 days**.
+      responses:
+        '200':
+          $ref: '#/components/responses/PullCancelTasks'
+        '400':
+          $ref: '#/components/responses/PullCancelTasksValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_ids:
+                  type: string
+                  description: >-
+                    Use it to get only cancel tasks specified by a
+                    comma-separated list of service IDs.
+                  example: '123,556,765'
+                limit:
+                  type: integer
+                  description: Maximum number of cancel tasks to return.
+                  default: 100
+                  maximum: 100
+                  example: 10
+  /cancel/reject:
+    post:
+      tags:
+        - Cancel
+      summary: Reject cancel
+      description: >
+        Use this call to set the Rejected status for one or more manual Cancel
+        tasks.
+      responses:
+        '200':
+          $ref: '#/components/responses/RejectCancelTasks'
+        '400':
+          $ref: '#/components/responses/RejectCancelTasksValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: string
+                  description: >-
+                    The unique identifier of cancel tasks. Use this parameter to
+                    reject manual cancel tasks specified by a comma-separated
+                    list of task IDs. Maximum 100 IDs per request.
+                  example: '12,33,46'
+  /refill/pull:
+    post:
+      tags:
+        - Refill
+      summary: Pull refill tasks
+      description: >
+        Use this call to get one or more manual Pending ‘Refill’ tasks and
+        update their status to ‘Awaiting’.
+
+        > **Note**: The method gives and processes only manual Refill tasks for
+        the **last 90 days**.
+      responses:
+        '200':
+          $ref: '#/components/responses/PullRefillTasks'
+        '400':
+          $ref: '#/components/responses/PullRefillTasksValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_ids:
+                  type: string
+                  description: >-
+                    Use it to get only refill tasks specified by a
+                    comma-separated list of service IDs.
+                  example: '123,556,765'
+                limit:
+                  type: integer
+                  description: Maximum number of refill tasks to return.
+                  default: 100
+                  maximum: 100
+                  example: 10
+  /payments:
+    get:
+      tags:
+        - Payments
+      summary: Get payment list
+      description: >-
+        Use this call to search and get a list of payments according to the
+        filters described below.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetPaymentList'
+        '400':
+          $ref: '#/components/responses/ValidationErrorPaymentList'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - name: ids
+          description: >
+            Use it to get one or multiple payments specified by a
+            comma-separated list of payment IDs.
+          in: query
+          required: false
+          example: 10547
+          schema:
+            type: string
+        - name: method
+          description: >-
+            Payment method used for the payment. This parameter allows filtering
+            payments by one or multiple methods specified as a comma-separated
+            list.
+          in: query
+          required: false
+          example: Perfect Money USD
+          schema:
+            type: string
+        - name: username
+          description: Username of the user who created the payment.
+          in: query
+          required: false
+          example: 'john Match pattern /[^0-9a-zA-Z_@\-\.]/'
+          schema:
+            type: string
+        - name: user_email
+          description: Email of the user who created the payment.
+          in: query
+          required: false
+          example: john@email.com
+          schema:
+            type: string
+        - name: user_id
+          description: The unique identifier (user ID) of the user who created the payment.
+          in: query
+          required: false
+          example: 42
+          schema:
+            type: integer
+        - name: payment_status
+          description: Use it to filter payments by their status.
+          in: query
+          required: false
+          example: completed
+          schema:
+            type: string
+            enum:
+              - waiting
+              - completed
+              - pending
+              - fail
+              - expired
+              - hold
+              - underpaid
+        - name: ip_address
+          description: Use it to get payments created from certain IP address.
+          in: query
+          required: false
+          example: 172.26.0.1
+          schema:
+            type: string
+        - name: memo
+          description: Payment memo.
+          in: query
+          required: false
+          example: 2316748250
+          schema:
+            type: string
+            maxLength: 300
+        - name: created_from
+          description: Payment creation UNIX timestamp (lower bound).
+          in: query
+          required: false
+          example: 1447804800
+          schema:
+            type: integer
+        - name: created_to
+          description: Payment creation UNIX timestamp (upper bound).
+          in: query
+          required: false
+          example: 1450448972
+          schema:
+            type: integer
+            default: The current day and time at the time the request is sent
+        - name: mode
+          description: Payment mode. Use it to filter payments by their mode.
+          in: query
+          required: false
+          example: manual
+          schema:
+            type: string
+            enum:
+              - manual
+              - auto
+        - name: offset
+          in: query
+          description: Offset from the beginning of the returned items list (for paging).
+          required: false
+          example: 10
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          description: Maximum number of returned payments.
+          in: query
+          required: false
+          example: 10
+          schema:
+            type: integer
+            maximum: 1000
+            default: 100
+        - name: sort
+          description: Use it to sort payments by their created date.
+          in: query
+          required: false
+          example: created-at-asc
+          schema:
+            type: string
+            default: created-at-desc
+            enum:
+              - created-at-desc
+              - created-at-asc
+              - updated-at-desc
+              - updated-at-asc
+  /orders/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Cancel and refund
+      description: Use this call to cancel and refund one or more orders.
+      responses:
+        '200':
+          $ref: '#/components/responses/Cancel'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: string
+                  description: >-
+                    The unique identifier of the order. Use it to cancel and
+                    refund one or multiple orders specified by a comma-separated
+                    list of order IDs. Maximum 100 IDs per request.
+                  example: '12,33,46'
+                cancel_reason:
+                  type: string
+                  description: >-
+                    Use it to add cancel reason for users. If specified, the
+                    reason will be applied to all orders in the request.
+                  example: Incorrect link
+  /payments/add:
+    post:
+      tags:
+        - Payments
+      summary: Add payment
+      description: Use this call to add payments for your panel users.
+      responses:
+        '200':
+          $ref: '#/components/responses/AddPayment'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/Username'
+                - $ref: '#/components/schemas/UserID'
+                - $ref: '#/components/schemas/UserEmail'
+    components:
+      schemas:
+        GeneralBody:
+          type: object
+          properties:
+            amount:
+              type: number
+              description: Payment amount in panel currency that will be added to the user
+              example: 12
+            method:
+              type: string
+              description: The payment method that will be shown in the payment details
+              minLength: 3
+              maxLength: 300
+              example: Perfect Money USD
+            memo:
+              type: string
+              description: Payment memo that will be shown in the payment details for staff
+              maxLength: 300
+              example: added via Admin API
+            affiliate_commission:
+              type: boolean
+              description: >-
+                Select true if you want to include the payment in the affiliate
+                commission
+              default: false
+              example: true
+          required:
+            - method
+            - amount
+        UserID:
+          properties:
+            user_id:
+              type: integer
+              description: >-
+                The unique identifier (user ID) of the user to which the payment
+                is being added
+              minimum: 1
+              example: 42
+          required:
+            - user_id
+          allOf:
+            - $ref: '#/components/schemas/GeneralBody'
+            - type: object
+            - title: User ID identity
+        Username:
+          properties:
+            username:
+              type: string
+              pattern: '/[^0-9a-zA-Z_@\-\.]/'
+              description: The username of the user to which the payment is being added
+              example: john
+          required:
+            - username
+          allOf:
+            - $ref: '#/components/schemas/GeneralBody'
+            - type: object
+            - title: Username identity
+        UserEmail:
+          properties:
+            user_email:
+              type: string
+              format: email
+              required: true
+              description: >-
+                The email address of the user to which the payment is being
+                added
+              example: john@email.com
+          required:
+            - user_email
+          allOf:
+            - $ref: '#/components/schemas/GeneralBody'
+            - type: object
+            - title: User email identity
+  /users/add:
+    post:
+      tags:
+        - Users
+      summary: Add user
+      description: Use this call to add a user to your panel.
+      responses:
+        '200':
+          $ref: '#/components/responses/AddUser'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/DefaultObject'
+                - $ref: '#/components/schemas/CustomObject'
+              discriminator:
+                propertyName: allowed_methods
+    components:
+      schemas:
+        General:
+          type: object
+          required:
+            - username
+            - email
+            - password
+          properties:
+            username:
+              type: string
+              pattern: '/[^0-9a-zA-Z_@\-\.]/'
+              minLength: 2
+              maxLength: 300
+              description: The username of the user to be created
+              example: john
+            email:
+              type: string
+              format: email
+              minLength: 5
+              maxLength: 300
+              description: The user’s email address
+              example: john@mail.com
+            password:
+              type: string
+              format: password
+              minLength: 8
+              maxLength: 20
+              description: The user’s password
+              example: 12qw34er5ty
+            first_name:
+              type: string
+              maxLength: 300
+              description: The user’s first name
+              example: John
+            last_name:
+              type: string
+              maxLength: 300
+              description: The user’s last name
+              example: Doe
+            phone:
+              type: string
+              maxLength: 128
+              description: The user’s phone number
+              example: (123) 456-7890
+            whatsapp:
+              type: string
+              maxLength: 128
+              description: The user’s whatsapp
+              example: john123
+            telegram:
+              type: string
+              maxLength: 128
+              description: The user’s telegram
+              example: john123
+            website:
+              type: string
+              maxLength: 128
+              description: The user’s website
+              example: 'https://johndoe.com'
+            skype:
+              type: string
+              maxLength: 128
+              description: The user’s skype
+              example: john123
+        DefaultObject:
+          title: When allowed_methods not custom
+          allOf:
+            - $ref: '#/components/schemas/General'
+            - type: object
+              properties:
+                allowed_methods:
+                  type: string
+                  default: new_users
+                  enum:
+                    - all
+                    - none
+                    - new_users
+                    - custom
+                  description: >-
+                    Use it to set which payment methods will be available for
+                    the created user. You can allow the user to use payment
+                    methods which are allowed for new users in payment settings,
+                    all payment methods, none or custom list of payment methods
+                  example: all
+              discriminator:
+                propertyName: allowed_methods
+        CustomObject:
+          title: When allowed_methods is custom
+          allOf:
+            - $ref: '#/components/schemas/General'
+            - type: object
+              properties:
+                allowed_methods:
+                  type: string
+                  enum:
+                    - custom
+                  description: >-
+                    Use it to set which payment methods will be available for
+                    the created user. You can allow the user to use payment
+                    methods which are allowed for new users in payment settings,
+                    all payment methods, none or custom list of payment methods
+                  example: custom
+                custom_list:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  uniqueItems: true
+                  description: >-
+                    Use it to allow a created user to use only payment methods
+                    specified by a comma-separated list of payment method IDs
+                  example:
+                    - 50
+                    - 51
+                    - 52
+          discriminator:
+            propertyName: allowed_methods
+          required:
+            - custom_list
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get user list
+      description: >
+        Use this call to search and get a list of users according to the filters
+        described below.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetUserList'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - name: ids
+          description: >-
+            Use it to get multiple users specified by a comma-separated list of
+            user IDs.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: '12,33,46'
+        - name: username
+          description: Use it to get a certain user by username.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: john123
+        - name: email
+          description: Use it to get a certain user by email address.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: john@test.com
+        - name: ip_addresses
+          description: >-
+            Use it to get multiple users specified by a comma-separated list of
+            user IP addresses
+          in: query
+          required: false
+          schema:
+            type: string
+          example: '172.26.0.1,172.26.0.2'
+        - name: status
+          description: User status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - suspended
+              - unconfirmed
+          example: active
+        - name: offset
+          in: query
+          description: Offset from the beginning of the returned items list (for paging).
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: '10'
+        - name: limit
+          description: Maximum number of returned users.
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 1000
+            default: 100
+          example: '10'
+        - name: sort
+          description: Use it to sort user by their created date.
+          in: query
+          required: false
+          example: created-at-desc
+          schema:
+            description: User sort type
+            type: string
+            default: created-at-asc
+            enum:
+              - created-at-desc
+              - created-at-asc
+  /tickets:
+    get:
+      tags:
+        - Tickets
+      summary: Get ticket list
+      description: >
+        Use this call to search and get a list of tickets according to the
+        filters described below.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetTicketList'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - name: ids
+          description: >-
+            Use it to get multiple tickets specified by a comma-separated list
+            of ticket IDs.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: '12,33,46'
+        - name: message
+          description: Use it to get all tickets that contain this message.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: lorem ipsum
+        - name: user
+          description: Use it to get all tickets created by a certain user.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: john123
+        - name: assignee
+          description: Use it to get all tickets assigned to a certain staff.
+          in: query
+          required: false
+          schema:
+            type: string
+          example: admin123
+        - name: status
+          description: Use it to get all tickets of a certain status.
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - pending
+              - answered
+              - closed
+              - locked
+              - welcome
+          example: pending
+        - name: is_read
+          description: Use it to get unread/read tickets by the staff.
+          in: query
+          required: false
+          schema:
+            type: boolean
+            enum:
+              - 0
+              - 1
+        - name: offset
+          in: query
+          description: Offset from the beginning of the returned items list (for paging).
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: '10'
+        - name: limit
+          description: Maximum number of returned items.
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 1000
+            default: 100
+          example: '50'
+  '/tickets/{ticket_id}':
+    get:
+      tags:
+        - Tickets
+      summary: Get ticket
+      description: >
+        Use this call to get all available information about a ticket referring
+        to its ID.
+      responses:
+        '200':
+          $ref: '#/components/responses/GetTicketView'
+        '400':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - in: path
+          name: ticket_id
+          description: Ticket ID
+          required: true
+          schema:
+            type: integer
+          example: 255
+  '/tickets/{ticket_id}/reply':
+    post:
+      tags:
+        - Tickets
+      summary: Reply to a ticket
+      description: |
+        Use this call to reply to a ticket with a message from an admin.
+      responses:
+        '200':
+          $ref: '#/components/responses/ReplyTicket'
+        '400':
+          $ref: '#/components/responses/NotFoundError'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+        - in: path
+          name: ticket_id
+          description: The id of the ticket to reply.
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 255
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - staff_name
+                - message
+              properties:
+                staff_name:
+                  type: string
+                  description: The staff (admin) name on whose behalf the reply is sent.
+                message:
+                  type: string
+                  description: The text body of the reply.
+  /tickets/add:
+    post:
+      tags:
+        - Tickets
+      summary: Add ticket
+      description: |
+        Use this call to add a new ticket to your panel user.
+      responses:
+        '200':
+          $ref: '#/components/responses/AddTicket'
+        '400':
+          $ref: '#/components/responses/ValidationErrorCreateTicket'
+      parameters:
+        - $ref: '#/components/parameters/XApiKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/TicketUsername'
+                - $ref: '#/components/schemas/TicketUserEmail'
+              type: object
+              required:
+                - username
+                - user_email
+                - subject
+                - message
+              properties:
+                staff_name:
+                  type: string
+                  description: >-
+                    Use it to specify the name of the staff member (admin) shown
+                    as the sender of the ticket message.
+                subject:
+                  type: string
+                  description: The subject of the ticket.
+                message:
+                  type: string
+                  description: The message text of the ticket.
+  /refill/change-status:
+    post:
+      tags:
+        - Refill
+      summary: Change refill status
+      description: >
+        Use this call to change status for one or multiple Refill tasks.
+
+        > Changing status is only allowed for **Pending** or **Awaiting** Refill
+        tasks. To complete a Refill task that is already In progress, set the
+        **Completed** status for the related Order ID.
+      responses:
+        '200':
+          description: Success change refill status response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - error_message
+                  - error_code
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ids:
+                        type: array
+                        description: List of successfully processed order IDs
+                        example:
+                          - 11
+                          - 23
+                          - 45
+                        items:
+                          type: integer
+                          example: 11
+                      skipped_ids:
+                        type: array
+                        description: List of Refill task IDs that were not processed.
+                        example:
+                          - 56
+                          - 67
+                          - 68
+                        items:
+                          type: integer
+                          example: 56
+                  error_message:
+                    description: Error message
+                    type: string
+                  error_code:
+                    description: Error code
+                    type: integer
+        '400':
+          description: Error change refill status response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - error_message
+                  - error_code
+                properties:
+                  data:
+                    description: Return data object
+                    type: array
+                  error_message:
+                    description: Error message
+                    type: string
+                    example: Maximum 100 tasks per request.
+                  error_code:
+                    description: Error code
+                    type: integer
+                    example: 400
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refill_tasks
+              properties:
+                refill_tasks:
+                  type: array
+                  description: |
+                    Array of refill tasks to update.
+                    Maximum 100 tasks per request.
+                  example:
+                    - id: 3
+                      status: completed
+                    - id: 2
+                      status: in_progress
+                  items:
+                    required:
+                      - id
+                      - status
+                    properties:
+                      id:
+                        type: integer
+                        example: 543
+                        description: Refill task ID
+                      status:
+                        type: string
+                        example: completed
+                        description: Refill task status to be changed to.
+                        enum:
+                          - rejected
+                          - in_progress
+                          - completed
+components:
+  schemas:
+    TicketUsername:
+      properties:
+        username:
+          type: string
+          pattern: '/[^0-9a-zA-Z_@\-\.]/'
+          description: The username of the user the ticket is created for.
+          example: john
+      required:
+        - username
+      allOf:
+        - type: object
+        - title: Username identity
+    TicketUserEmail:
+      properties:
+        user_email:
+          type: string
+          format: email
+          required: true
+          description: The email address of the user the ticket is created for.
+          example: john@email.com
+      required:
+        - user_email
+      allOf:
+        - type: object
+        - title: User email identity
+    Pagination:
+      type: object
+      description: |
+        **Pagination** object.
+      required:
+        - prev_page_href
+        - next_page_href
+        - offset
+        - limit
+      properties:
+        prev_page_href:
+          type: string
+          description: Previous page URL
+          example: '/adminapi/v2/{endpoint}?offset=20&limit=10'
+        next_page_href:
+          type: string
+          description: Next page URL
+          example: '/adminapi/v2/{endpoint}?offset=30&limit=10'
+        offset:
+          type: integer
+          description: Offset from the beginning of the returned items list (for paging)
+          example: 20
+        limit:
+          type: integer
+          description: Maximum number of returned items
+          example: 10
+    OrderItem:
+      description: |
+        The **Order** model of the **Get order** method
+      type: object
+      required:
+        - id
+        - external_id
+        - user
+        - creation_type
+        - charge
+        - link
+        - order_buttons
+        - start_count
+        - quantity
+        - service_id
+        - service_type
+        - service_name
+        - provider
+        - status
+        - remains
+        - is_autocomplete
+        - is_active_autocomplete
+        - created
+        - created_timestamp
+        - mode
+        - provider_response
+        - last_update
+        - last_update_timestamp
+        - ip_address
+        - actions
+      properties:
+        id:
+          type: integer
+          description: Order ID
+          example: 255
+        external_id:
+          type: string
+          description: >-
+            External (provider’s) order ID. **View external ID** access
+            required.
+          example: xc34-433-yu3
+        user:
+          type: string
+          description: The user who created the order
+          example: alex
+        creation_type:
+          type: string
+          description: Order creation type
+          example: new_order_form
+          enum:
+            - new_order_form
+            - api
+            - mass_order_form
+            - subscription
+            - drip_feed
+            - refiller
+        charge:
+          description: Order charge info
+          $ref: '#/components/schemas/OrderPanelCharge'
+        provider_charge:
+          description: >-
+            A provider's charge per order in panel currency. **View provider
+            charge** access required.
+          $ref: '#/components/schemas/OrderProviderChargePanelCurrency'
+        provider_currency_charge:
+          description: >-
+            A provider's charge per order in provider's currency. **View
+            provider charge** access required.
+          $ref: '#/components/schemas/OrderProviderChargeProviderCurrency'
+        link:
+          type: string
+          description: Order link
+          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+        order_buttons:
+          description: >-
+            Order details buttons array. Contains info if additional data was
+            entered by the user when creating an order
+          type: object
+          properties:
+            user_data:
+              description: >-
+                Additional data that was entered by a user when creating the
+                order
+              type: array
+              items:
+                type: string
+                example: example-comment-1
+        start_count:
+          type: integer
+          description: Order start count quantity
+          example: 12
+        quantity:
+          type: integer
+          description: Order quantity
+          example: 2500
+        service_id:
+          type: integer
+          description: Service ID
+          example: 466
+        service_type:
+          type: string
+          description: Service type
+          example: mentions_user_followers
+        service_name:
+          type: string
+          description: Service name
+          example: Mentions user followers
+        status:
+          type: string
+          description: Order status
+          enum:
+            - pending
+            - in_progress
+            - processing
+            - completed
+            - partial
+            - canceled
+            - error
+            - fail
+          example: processing
+        remains:
+          type: integer
+          description: Order remains. The quantity left to fulfill the order
+          example: 544
+        is_autocomplete:
+          type: boolean
+          description: "Autocomplete availability for the order. Has the value\_true if the autocomplete option is enabled for this order or the value\_false otherwise."
+          example: false
+        is_active_autocomplete:
+          type: boolean
+          description: "Status of autocompletion for the order. Has the value\_true if the autocomplete option is enabled for this order and order is not completed yet or the value\_false if the order was autocompleted already."
+          example: false
+        created:
+          type: string
+          description: The date/time of order creation
+          example: '2021-11-30 14:08:53'
+        created_timestamp:
+          type: integer
+          description: The date of order creation in UNIX Timestamp format
+          example: 1447804800
+        mode:
+          type: string
+          description: Order mode
+          enum:
+            - auto
+            - manual
+          example: auto
+        provider:
+          type: string
+          description: 'Provider name or alias, depending on key access.'
+          example: panel.com
+        provider_response:
+          type: object
+          description: >-
+            Raw provider response data. **View provider response** access
+            required.
+          example: '{order_id: 477-344-555}'
+        last_update:
+          type: string
+          description: The date/time when the order status was updated last time
+          example: '2021-11-30 14:08:53'
+        last_update_timestamp:
+          type: integer
+          description: >-
+            The date/time when the order status was updated last time in UNIX
+            Timestamp format
+          example: 1447804800
+        ip_address:
+          type: string
+          description: IP address from which the order was created
+          examlpe: 444.555.666.777
+        actions:
+          type: object
+          description: Info about actions that are available for this order.
+          required:
+            - details
+            - resend
+            - edit
+            - set_start_count
+            - set_remains
+            - refill
+            - disable_refill
+            - set_partial
+            - cancel_and_refund
+            - set_status
+            - set_pending
+            - set_inprogress
+            - set_processing
+            - set_canceled
+            - set_completed
+            - request_cancel
+          properties:
+            details:
+              type: boolean
+              description: "Has the value\_true if **Order details** are available for this order or the value\_false otherwise.\n"
+              example: true
+            resend:
+              type: boolean
+              description: "Has the value\_true if the **Resend** action is available for this order or the value\_false otherwise.\n> If you need to resend the order to a provider use the **Resend order** method.\n"
+              example: false
+            edit:
+              type: boolean
+              description: "Has the value\_true if the **Edit** action is available for this order or the value\_false otherwise.\n> If you need to edit order link use the **Edit order link** method.\n"
+              example: false
+            set_start_count:
+              type: boolean
+              description: "Has the value\_true if the **Set start count** action is available for this order or the value\_false otherwise.\n> If you need to set the start count value, use the **Set start count** method.\n"
+              example: false
+            set_remains:
+              type: boolean
+              description: "Has the value\_true if the **Set remains** action is available for this order or the value\_false otherwise.\n> If you need to set the remains value, use the **Set remains** method.\n"
+              example: false
+            refill:
+              type: boolean
+              description: "Has the value\_true if the **Refill** action is available for this order or the value\_false otherwise.\n> If you need to refill the order, use the **Refill order** method.\n"
+              example: false
+            disable_refill:
+              type: boolean
+              description: "Has the value\_true if the **Disable refill** action is available for this order or the value\_false otherwise.\n> If you need to make the refill button not available for the order, use the **Disable refill** method.\n"
+              example: false
+            set_partial:
+              type: boolean
+              description: "Has the value\_true if the **Set partial** action is available for this order or the value\_false otherwise.\n> If you need set partial the order, use the **Set partial** method.\n"
+              example: false
+            cancel_and_refund:
+              type: boolean
+              description: "Has the value\_true if the **Cancel and refund** action is available for this order or the value\_false otherwise.\n> If you need to cancel the order, use the **Cancel and refund** method.\n"
+              example: false
+            set_pending:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Pending** action is available for this order or the value\_false otherwise.\n> If you need to cancel the order, use the **Change status** method.\n"
+              example: false
+            set_inprogress:
+              type: boolean
+              description: "Has the value\_true if the **Change status → In progress** action is available for this order or the value\_false otherwise.\n> If you need to set in progress the order, use the **Change status** method.\n"
+              example: false
+            set_processing:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Processing** action is available for this order or the value\_false otherwise.\n> If you need to set processing the order, use the **Change status** method.\n"
+              example: false
+            set_completed:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Completed** action is available for this order or the value\_false otherwise.\n> If you need to set completed the order, use the **Change status** method.\n"
+              example: false
+            request_cancel:
+              type: boolean
+              description: "Has the value\_true if the **Request cancel** action is available for this order or the value\_false otherwise.\n> If you need to request order cancellation, use the **Request cancel** method.\n"
+              example: false
+    OrderListItem:
+      description: |
+        The **Order** model of the **Get order list** method
+      type: object
+      required:
+        - id
+        - external_id
+        - user
+        - creation_type
+        - charge
+        - link
+        - order_buttons
+        - start_count
+        - quantity
+        - service_id
+        - service_type
+        - service_name
+        - provider
+        - status
+        - remains
+        - is_autocomplete
+        - is_active_autocomplete
+        - created
+        - created_timestamp
+        - mode
+        - ip_address
+        - actions
+      properties:
+        id:
+          type: integer
+          description: Order ID
+          example: 244
+        external_id:
+          type: string
+          description: >-
+            External (provider’s) order ID. **View external ID** access
+            required.
+          example: xc34-433-yu3
+        user:
+          type: string
+          description: The user who created the order
+          example: alex
+        creation_type:
+          type: string
+          description: Order creation type
+          example: new_order_form
+          enum:
+            - new_order_form
+            - api
+            - mass_order_form
+            - subscription
+            - drip_feed
+            - refiller
+        charge:
+          description: Order charge info
+          $ref: '#/components/schemas/OrderPanelCharge'
+        provider_charge:
+          description: >-
+            A provider's charge per order in panel currency. **View provider
+            charge** access required.
+          $ref: '#/components/schemas/OrderProviderChargePanelCurrency'
+        provider_currency_charge:
+          description: >-
+            A provider's charge per order in provider's currency. **View
+            provider charge** access required.
+          $ref: '#/components/schemas/OrderProviderChargeProviderCurrency'
+        link:
+          type: string
+          description: Order link
+          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+        order_buttons:
+          type: array
+          description: >-
+            Order buttons array. Contains info if additional data was entered by
+            the user when creating an order
+          items:
+            description: Order buttons array
+            type: object
+            properties:
+              title:
+                type: string
+                description: Button title
+                example: Hashtag
+              service_type:
+                type: string
+                description: Button service type
+                example: mentions_hashtag
+              type:
+                type: string
+                description: Button type
+                example: hashtag
+        start_count:
+          type: integer
+          description: Order start count quantity
+          example: 12
+        quantity:
+          type: integer
+          description: Order quantity
+          example: 3000
+        service_id:
+          type: integer
+          description: Service ID
+          example: 455
+        service_type:
+          type: string
+          description: Service type
+          example: mentions_user_followers
+        service_name:
+          type: string
+          description: Service name
+          example: Mentions user followers
+        provider:
+          type: string
+          description: 'Provider name or alias, depending on key access.'
+          example: example.com
+        status:
+          type: string
+          description: Order status
+          enum:
+            - pending
+            - in_progress
+            - processing
+            - completed
+            - partial
+            - canceled
+            - error
+            - fail
+          example: completed
+        remains:
+          type: integer
+          description: Order remains. The quantity left to fulfill the order
+          example: 377
+        is_autocomplete:
+          type: boolean
+          description: "Autocomplete availability for the order. Has the value\_true if the autocomplete option is enabled for this order or the value\_false otherwise."
+          example: false
+        is_active_autocomplete:
+          type: boolean
+          description: "Status of autocompletion for the order. Has the value\_true if the autocomplete option is enabled for this order and order is not completed yet or the value\_false if the order was autocompleted already."
+          example: false
+        created:
+          type: string
+          description: The date/time of order creation
+          example: '2021-11-30 14:08:53'
+        created_timestamp:
+          type: integer
+          description: The date of order creation in UNIX Timestamp format
+          example: 1447804800
+        mode:
+          type: string
+          description: Order mode
+          enum:
+            - auto
+            - manual
+          example: auto
+        ip_address:
+          type: string
+          description: IP address from which the order was created
+          example: 333.444.555.666
+        actions:
+          type: object
+          description: Info about actions that are available for this order.
+          required:
+            - details
+            - resend
+            - edit
+            - set_start_count
+            - set_remains
+            - refill
+            - disable_refill
+            - set_partial
+            - cancel_and_refund
+            - set_status
+            - set_pending
+            - set_inprogress
+            - set_processing
+            - set_canceled
+            - set_completed
+            - request_cancel
+          properties:
+            details:
+              type: boolean
+              description: "Has the value\_true if **Order details** are available for this order or the value\_false otherwise.\n> If you need to get order details use the **Get order** method.\n"
+              example: true
+            resend:
+              type: boolean
+              description: "Has the value\_true if the **Resend** action is available for this order or the value\_false otherwise.\n> If you need to resend the order to a provider use the **Resend order** method.\n"
+              example: false
+            edit:
+              type: boolean
+              description: "Has the value\_true if the **Edit** action is available for this order or the value\_false otherwise.\n> If you need to edit order link use the **Edit order link** method.\n"
+              example: false
+            set_start_count:
+              type: boolean
+              description: "Has the value\_true if the **Set start count** action is available for this order or the value\_false otherwise.\n> If you need to set the start count value, use the **Set start count** method.\n"
+              example: false
+            set_remains:
+              type: boolean
+              description: "Has the value\_true if the **Set remains** action is available for this order or the value\_false otherwise.\n> If you need to set the remains value, use the **Set remains** method.\n"
+              example: false
+            refill:
+              type: boolean
+              description: "Has the value\_true if the **Refill** action is available for this order or the value\_false otherwise.\n> If you need to refill the order, use the **Refill order** method.\n"
+              example: false
+            disable_refill:
+              type: boolean
+              description: "Has the value\_true if the **Disable refill** action is available for this order or the value\_false otherwise.\n> If you need to make the refill button not available for the order, use the **Disable refill** method.\n"
+              example: false
+            set_partial:
+              type: boolean
+              description: "Has the value\_true if the **Set partial** action is available for this order or the value\_false otherwise.\n> If you need set partial the order, use the **Set partial** method.\n"
+              example: false
+            cancel_and_refund:
+              type: boolean
+              description: "Has the value\_true if the **Cancel and refund** action is available for this order or the value\_false otherwise.\n> If you need to cancel the order, use the **Cancel and refund** method.\n"
+              example: false
+            set_pending:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Pending** action is available for this order or the value\_false otherwise.\n> If you need to cancel the order, use the **Change status** method.\n"
+              example: false
+            set_inprogress:
+              type: boolean
+              description: "Has the value\_true if the **Change status → In progress** action is available for this order or the value\_false otherwise.\n> If you need to set in progress the order, use the **Change status** method.\n"
+              example: false
+            set_processing:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Processing** action is available for this order or the value\_false otherwise.\n> If you need to set processing the order, use the **Change status** method.\n"
+              example: false
+            set_completed:
+              type: boolean
+              description: "Has the value\_true if the **Change status → Completed** action is available for this order or the value\_false otherwise.\n> If you need to set completed the order, use the **Change status** method.\n"
+              example: false
+            request_cancel:
+              type: boolean
+              description: "Has the value\_true if the **Request cancel** action is available for this order or the value\_false otherwise.\n> If you need to request order cancellation, use the **Request cancel** method.\n"
+              example: false
+    PaymentListItem:
+      description: |
+        The **Payment** model of the **Get payment list** method
+      type: object
+      required:
+        - payment_id
+        - user
+        - amount
+        - converted_from
+        - method
+        - status
+        - memo
+        - created
+        - created_timestamp
+        - updated
+        - updated_timestamp
+        - mode
+      properties:
+        payment_id:
+          type: integer
+          description: Unique identifier (payment ID) of the payment
+          example: 10547
+        user:
+          $ref: '#/components/schemas/GetPaymentsUser'
+        amount:
+          $ref: '#/components/schemas/GetPaymentsAmount'
+        converted_from:
+          $ref: '#/components/schemas/GetPaymentsConvertedFrom'
+        method:
+          type: string
+          description: Payment method
+          example: Perfect Money USD
+        status:
+          type: string
+          description: Order status
+          enum:
+            - waiting
+            - completed
+            - pending
+            - fail
+            - expired
+            - hold
+            - underpaid
+          example: completed
+        memo:
+          type: string
+          description: Payment memo added to the payment details.
+          example: 2316748250
+        created:
+          type: string
+          description: The date/time of payment creation
+          example: '2021-11-30 14:08:53'
+        created_timestamp:
+          type: integer
+          description: The date of payment creation in UNIX Timestamp format
+          example: 1447804800
+        updated:
+          type: string
+          description: The date/time of payment update
+          example: '2021-11-30 14:08:53'
+        updated_timestamp:
+          type: integer
+          description: The date of payment update in UNIX Timestamp format
+          example: 1447804800
+        mode:
+          type: string
+          description: Payment mode
+          enum:
+            - auto
+            - manual
+          example: auto
+    AddPaymentAmountItem:
+      type: object
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Payment amount in panel currency
+          example: '12'
+        currency_code:
+          type: string
+          description: Panel currency code in ISO 4217 for this payment
+          example: USD
+        formatted:
+          type: string
+          description: Formatted amount with currency symbol
+          example: $12.00
+    AddPaymentUserItem:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - balance
+      properties:
+        id:
+          type: integer
+          description: >-
+            Unique identifier (user ID) of the user to which the payment has
+            been added
+          example: 42
+        username:
+          type: string
+          description: Username of the user to which the payment has been added
+          example: john
+        email:
+          type: string
+          format: email
+          description: Email address of the user to which the payment has been added
+          example: john@email.com
+        balance:
+          type: string
+          description: User balance after adding the payment
+          example: '13.55'
+    GetPaymentsUser:
+      type: object
+      required:
+        - username
+        - balance
+      properties:
+        user_ID:
+          type: string
+          description: >-
+            Unique identifier (user ID) of the user to which the payment has
+            been added. **View user details** access required.
+          example: 42
+        username:
+          type: string
+          description: Username of the user to which the payment has been added
+          example: john
+        user_email:
+          type: string
+          description: >-
+            Email address of the user to which the payment has been added.
+            **View user details** access required.
+          example: john@email.com
+        balance:
+          type: number
+          description: User balance before the payment has been added
+    GetPaymentsAmount:
+      type: object
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Payment amount in panel currency
+          example: 12
+        currency_code:
+          type: string
+          description: Panel currency code in ISO 4217 for this payment
+          example: USD
+        formatted:
+          type: string
+          description: Formatted amount with currency symbol
+          example: $12.00
+    GetPaymentsConvertedFrom:
+      type: object
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Payment amount in payment method currency
+          example: 10
+        currency_code:
+          type: string
+          description: Payment method currency code in ISO 4217 for this payment
+          example: EUR
+        formatted:
+          type: string
+          description: Formatted amount with currency symbol
+          example: €10.00
+    UserListItem:
+      description: |
+        The **User** model of the **Get user list** method
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - balance
+        - spent
+        - status
+        - created
+        - created_timestamp
+        - last_auth
+        - last_auth_timestamp
+        - discount
+        - custom_rates
+        - last_ip_address
+        - details
+        - actions
+      properties:
+        id:
+          type: integer
+          description: User ID
+          example: 244
+        username:
+          type: string
+          description: Unique username of the user
+          example: john
+        email:
+          type: string
+          format: email
+          description: User email address. **View email** access required.
+          example: john@test.com
+        balance:
+          type: object
+          description: User balance. **View balance** access required.
+          properties:
+            value:
+              type: string
+              description: User balance amount in panel currency
+              example: '42.50'
+            currency_code:
+              type: string
+              minLength: 3
+              maxLength: 3
+              description: Panel currency code in ISO 4217
+              example: USD
+            formatted:
+              type: string
+              description: Formatted user balance with currency symbol
+              example: $42.50
+        spent:
+          type: object
+          description: User spent. **View spent** access required.
+          properties:
+            value:
+              type: string
+              description: User spent amount in panel currency.
+              example: '22.50'
+            currency_code:
+              type: string
+              minLength: 3
+              maxLength: 3
+              description: Panel currency code in ISO 4217
+              example: USD
+            formatted:
+              type: string
+              description: Formatted user spent with currency symbol
+              example: $22.50
+        status:
+          type: string
+          description: User status
+          enum:
+            - Active
+            - Suspended
+            - Unconfirmed
+          example: Active
+        created:
+          type: string
+          description: Date/time of user creation
+          example: '2021-11-30 14:08:53'
+        created_timestamp:
+          type: integer
+          description: Date/time of user creation in UNIX Timestamp format
+          example: 1447804800
+        last_auth:
+          type: string
+          description: Date and time of the last user authorization
+          example: '2021-11-30 14:08:53'
+        last_auth_timestamp:
+          type: integer
+          description: Date of the last user authorization in UNIX Timestamp format
+          example: 1447804800
+        discount:
+          type: object
+          description: User discount. Contains info if the user has a discount
+          properties:
+            value:
+              type: string
+              description: Discount value
+              example: '0'
+            formatted:
+              type: string
+              description: Formatted discount value with percent symbol
+              example: 0%
+        custom_rates:
+          type: array
+          description: >-
+            Custom rates array. Contains info if custom rates are set for the
+            user
+          items:
+            description: User custom rates array
+            type: object
+            properties:
+              service_id:
+                type: integer
+                description: Service ID
+                example: 5
+              service_name:
+                type: string
+                description: Service name
+                example: Lorem ipsum
+              custom_rate:
+                type: string
+                description: Service custom rate
+                example: '35.50'
+              percent:
+                type: string
+                description: Custom percentage (of the cost of the service)
+                example: '0'
+        last_ip_address:
+          type: string
+          description: IP address used during the last authorization of the user
+          example: 333.444.555.666
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional user details. **View user details** access required.
+          maxProperties: 10
+          properties:
+            first_name:
+              type: string
+              description: User’s first name
+              example: John
+            last_name:
+              type: string
+              description: User’s last name
+              example: Doe
+            skype:
+              type: string
+              description: User’s Skype
+              example: john123
+            whatsapp:
+              type: string
+              description: User’s WhatsApp
+              example: john123
+            telegram:
+              type: string
+              description: User’s Telegram
+              example: john123
+            phone:
+              type: string
+              description: User’s phone
+              example: (555) 123-4567
+            website:
+              type: string
+              description: User’s website
+              example: 'https://user-website.com/'
+    TicketListItem:
+      description: |
+        The **Ticket** model of the **Get ticket list** method
+      type: object
+      required:
+        - id
+        - user
+        - subject
+        - status
+        - assignee
+        - created
+        - created_timestamp
+        - last_update
+        - last_update_timestamp
+        - is_read
+      properties:
+        id:
+          type: integer
+          description: Ticket ID
+          example: 244
+        user:
+          type: object
+          description: Ticket user (the user who sent or received the ticket)
+          properties:
+            id:
+              type: integer
+              description: User ID
+              example: 5
+            username:
+              type: string
+              description: Unique username of the user
+              example: john123
+        subject:
+          type: string
+          description: Ticket subject
+          example: Testing ticket
+        status:
+          type: string
+          description: Ticket status
+          enum:
+            - Pending
+            - Answered
+            - Closed
+            - Locked
+            - Welcome
+          example: Pending
+        assignee:
+          type: string
+          description: Ticket assignee
+          example: admin123
+        created:
+          type: string
+          description: Date and time of ticket creation
+          example: '2021-11-30 14:08:53'
+        created_timestamp:
+          type: integer
+          description: Date and time of ticket creation in UNIX Timestamp format
+          example: 1447804800
+        last_update:
+          type: string
+          description: Date and time of the last ticket update (response or status change)
+          example: '2021-11-30 14:08:53'
+        last_update_timestamp:
+          type: integer
+          description: >-
+            Date and time of the last ticket update (response or status change)
+            in UNIX Timestamp format
+          example: 1447804800
+        is_read:
+          type: boolean
+          description: >-
+            Ticket status of whether the ticket has been unread/read by the
+            staff.
+          example: true
+    OrderStatus:
+      description: Order processing status.
+      type: string
+      enum:
+        - pending
+        - in_progress
+        - processing
+        - completed
+        - partial
+        - canceled
+        - error
+        - fail
+    OrderMode:
+      description: Order mode.
+      type: string
+      enum:
+        - manual
+        - auto
+    OrderCreationType:
+      description: Order creation type.
+      type: string
+      enum:
+        - new_order_form
+        - api
+        - mass_order_form
+        - subscription
+        - drip_feed
+        - refiller
+    OrderPanelCharge:
+      type: object
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Order charge amount in panel currency
+          example: 100
+        currency_code:
+          type: string
+          description: Panel currency code in ISO 4217 for this order
+          example: USD
+        formatted:
+          type: string
+          description: Formatted charge with currency symbol
+          example: $100.00
+    OrderProviderChargePanelCurrency:
+      type: object
+      description: >-
+        A provider's charge per order in panel currency. **View provider
+        charge** access required.
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Order charge amount in panel currency
+          example: 95
+        currency_code:
+          type: string
+          description: Panel currency code in ISO 4217 for this order
+          example: USD
+        formatted:
+          type: string
+          description: Formatted charge with currency symbol
+          example: $95
+    OrderProviderChargeProviderCurrency:
+      type: object
+      description: >-
+        A provider's charge per order in provider's currency. **View provider
+        charge** access required.
+      required:
+        - value
+        - currency_code
+        - formatted
+      properties:
+        value:
+          type: string
+          description: Order charge amount in provider currency
+          example: 7728
+        currency_code:
+          type: string
+          description: Provider currency code in ISO 4217 for this order
+          example: INR
+        formatted:
+          type: string
+          description: Formatted charge with currency symbol
+          example: ₹7728
+    GeneralBody:
+      type: object
+      properties:
+        amount:
+          type: number
+          description: Payment amount in panel currency that will be added to the user
+          example: 12
+        method:
+          type: string
+          description: The payment method that will be shown in the payment details
+          minLength: 3
+          maxLength: 300
+          example: Perfect Money USD
+        memo:
+          type: string
+          description: Payment memo that will be shown in the payment details for staff
+          maxLength: 300
+          example: added via Admin API
+        affiliate_commission:
+          type: boolean
+          description: >-
+            Select true if you want to include the payment in the affiliate
+            commission
+          default: false
+          example: true
+      required:
+        - method
+        - amount
+    Username:
+      properties:
+        username:
+          type: string
+          pattern: '/[^0-9a-zA-Z_@\-\.]/'
+          description: The username of the user to which the payment is being added
+          example: john
+      required:
+        - username
+      allOf:
+        - $ref: '#/components/schemas/GeneralBody'
+        - type: object
+        - title: Username identity
+    UserID:
+      properties:
+        user_id:
+          type: integer
+          description: >-
+            The unique identifier (user ID) of the user to which the payment is
+            being added
+          minimum: 1
+          example: 42
+      required:
+        - user_id
+      allOf:
+        - $ref: '#/components/schemas/GeneralBody'
+        - type: object
+        - title: User ID identity
+    UserEmail:
+      properties:
+        user_email:
+          type: string
+          format: email
+          required: true
+          description: The email address of the user to which the payment is being added
+          example: john@email.com
+      required:
+        - user_email
+      allOf:
+        - $ref: '#/components/schemas/GeneralBody'
+        - type: object
+        - title: User email identity
+    General:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          pattern: '/[^0-9a-zA-Z_@\-\.]/'
+          minLength: 2
+          maxLength: 300
+          description: The username of the user to be created
+          example: john
+        email:
+          type: string
+          format: email
+          minLength: 5
+          maxLength: 300
+          description: The user’s email address
+          example: john@mail.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 20
+          description: The user’s password
+          example: 12qw34er5ty
+        first_name:
+          type: string
+          maxLength: 300
+          description: The user’s first name
+          example: John
+        last_name:
+          type: string
+          maxLength: 300
+          description: The user’s last name
+          example: Doe
+        phone:
+          type: string
+          maxLength: 128
+          description: The user’s phone number
+          example: (123) 456-7890
+        whatsapp:
+          type: string
+          maxLength: 128
+          description: The user’s whatsapp
+          example: john123
+        telegram:
+          type: string
+          maxLength: 128
+          description: The user’s telegram
+          example: john123
+        website:
+          type: string
+          maxLength: 128
+          description: The user’s website
+          example: 'https://johndoe.com'
+        skype:
+          type: string
+          maxLength: 128
+          description: The user’s skype
+          example: john123
+    DefaultObject:
+      title: When allowed_methods not custom
+      allOf:
+        - $ref: '#/components/schemas/General'
+        - type: object
+          properties:
+            allowed_methods:
+              type: string
+              default: new_users
+              enum:
+                - all
+                - none
+                - new_users
+                - custom
+              description: >-
+                Use it to set which payment methods will be available for the
+                created user. You can allow the user to use payment methods
+                which are allowed for new users in payment settings, all payment
+                methods, none or custom list of payment methods
+              example: all
+          discriminator:
+            propertyName: allowed_methods
+    CustomObject:
+      title: When allowed_methods is custom
+      allOf:
+        - $ref: '#/components/schemas/General'
+        - type: object
+          properties:
+            allowed_methods:
+              type: string
+              enum:
+                - custom
+              description: >-
+                Use it to set which payment methods will be available for the
+                created user. You can allow the user to use payment methods
+                which are allowed for new users in payment settings, all payment
+                methods, none or custom list of payment methods
+              example: custom
+            custom_list:
+              type: array
+              items:
+                type: integer
+              minItems: 1
+              uniqueItems: true
+              description: >-
+                Use it to allow a created user to use only payment methods
+                specified by a comma-separated list of payment method IDs
+              example:
+                - 50
+                - 51
+                - 52
+      discriminator:
+        propertyName: allowed_methods
+      required:
+        - custom_list
+  parameters:
+    PaginationOffset:
+      name: offset
+      in: query
+      description: Offset from the beginning of the returned items list (Pagination).
+      required: false
+      schema:
+        type: integer
+        format: int32
+    PaginationLimit:
+      name: limit
+      in: query
+      description: Maximum number of returned items (Pagination).
+      required: false
+      schema:
+        type: integer
+        format: int32
+    XApiKeyHeader:
+      name: X-Api-Key
+      in: header
+      description: API key for authorization
+      required: true
+      schema:
+        type: string
+      example: 123
+  responses:
+    OrdersUpdateResponse:
+      description: Success orders update response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - success
+                      properties:
+                        id:
+                          type: integer
+                          example: 1508
+                        success:
+                          type: boolean
+                          example: true
+                        error_message:
+                          type: string
+                          example: Cannot update remains
+                        error_code:
+                          type: integer
+                          example: 200
+              error_message:
+                type: string
+                description: Global error message (if any)
+              error_code:
+                type: integer
+                description: Global error code
+    OrdersUpdateValidationError:
+      description: Validation error response for updating orders
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - error_message
+              - error_code
+            properties:
+              error_message:
+                type: string
+                description: Error message
+                example: Remains cannot be blank
+              error_code:
+                type: integer
+                description: Error code
+                example: 400
+    PullCancelTasks:
+      description: Success pull cancel tasks response
+      content:
+        application/json:
+          schema:
+            required:
+              - data
+              - error_message
+              - error_code
+            type: object
+            properties:
+              data:
+                type: object
+                required:
+                  - count
+                  - list
+                properties:
+                  count:
+                    description: Total number of returned tasks
+                    type: integer
+                    example: 2
+                  list:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - task_id
+                        - order_id
+                        - service_id
+                        - link
+                        - created
+                        - created_timestamp
+                      properties:
+                        task_id:
+                          type: integer
+                          description: Unique identifier (Task ID) of the Cancel task
+                          example: 345
+                        order_id:
+                          type: integer
+                          description: >-
+                            Unique identifier (Order ID) of the order for which
+                            cancellation is requested
+                          example: 54332
+                        service_id:
+                          type: integer
+                          description: Service ID
+                          example: 84
+                        link:
+                          type: string
+                          description: Order link
+                          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+                        created:
+                          type: string
+                          description: The date/time of cancel task creation
+                          format: date-time
+                          example: '2021-11-30 14:08:53'
+                        created_timestamp:
+                          description: >-
+                            The date of cancel task creation in UNIX Timestamp
+                            format
+                          type: integer
+                          example: 1447804800
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    PullCancelTasksValidationError:
+      description: Validation error response for pulling cancel tasks
+      content:
+        application/json:
+          schema:
+            required:
+              - error_message
+              - error_code
+            type: object
+            properties:
+              error_message:
+                type: string
+                description: Error message
+                example: Invalid service ID
+              error_code:
+                type: integer
+                description: Error code
+                example: 400
+    RejectCancelTasks:
+      description: Success orders change status response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    description: List of successfully rejected cancel task IDs
+                    items:
+                      type: integer
+                      example:
+                        - 12
+                        - 33
+                  skipped_ids:
+                    type: array
+                    description: List of cancel task IDs that were not processed.
+                    items:
+                      type: integer
+                      example:
+                        - 46
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    RejectCancelTasksValidationError:
+      description: Validation error response for rejecting cancel tasks
+      content:
+        application/json:
+          schema:
+            required:
+              - error_message
+              - error_code
+            type: object
+            properties:
+              error_message:
+                type: string
+                description: Error message
+                example: Invalid task ID format
+              error_code:
+                type: integer
+                description: Error code
+                example: 400
+    PullRefillTasks:
+      description: Success pull refill tasks response
+      content:
+        application/json:
+          schema:
+            required:
+              - data
+              - error_message
+              - error_code
+            type: object
+            properties:
+              data:
+                type: object
+                required:
+                  - count
+                  - list
+                properties:
+                  count:
+                    description: Total number of returned tasks
+                    type: integer
+                    example: 2
+                  list:
+                    description: List of returned Refill tasks
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - task_id
+                        - order_id
+                        - start_count
+                        - quantity
+                        - current_count
+                        - to_refill
+                        - service_id
+                        - link
+                        - created
+                        - created_timestamp
+                      properties:
+                        task_id:
+                          type: integer
+                          description: Unique identifier (Task ID) of the Refill task
+                          example: 345
+                        order_id:
+                          type: integer
+                          description: >-
+                            Unique identifier (Order ID) of the order for which
+                            refill is requested
+                          example: 54332
+                        start_count:
+                          type: integer
+                          description: Order start count quantity
+                          example: 12
+                        quantity:
+                          type: integer
+                          description: Order quantity
+                          example: 3000
+                        current_count:
+                          type: integer
+                          description: Order current count quantity
+                          example: 2500
+                        to_refill:
+                          type: integer
+                          description: >-
+                            Quantity that needs to be refilled. Calculated if
+                            ‘Refill check’ option is enabled for the service.
+                          example: 512
+                        service_id:
+                          type: integer
+                          description: Service ID
+                          example: 84
+                        link:
+                          type: string
+                          description: Order link
+                          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+                        created:
+                          type: string
+                          description: The date/time of refill task creation
+                          format: date-time
+                          example: '2021-11-30 14:08:53'
+                        created_timestamp:
+                          description: >-
+                            The date of refill task creation in UNIX Timestamp
+                            format
+                          type: integer
+                          example: 1447804800
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    PullRefillTasksValidationError:
+      description: Validation error response for pulling refill tasks
+      content:
+        application/json:
+          schema:
+            required:
+              - error_message
+              - error_code
+            type: object
+            properties:
+              error_message:
+                type: string
+                description: Error message
+                example: Invalid service ID
+              error_code:
+                type: integer
+                description: Error code
+                example: 400
+    NotFoundError:
+      description: The requested object doesn't exist
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Object not found
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 40
+    SetPartialNotFoundError:
+      description: Request parameter validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Object not found
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 40
+    OrderNotFoundError:
+      description: The requested object doesn't exist
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Order not found
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 40
+    PullOrdersValidationError:
+      description: Query param validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Invalid service ID
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 25
+    ValidationError:
+      description: Query param validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Invalid order ID format
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 25
+    ValidationErrorSetPartial:
+      description: Request parameter validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Invalid order ID format
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 25
+    ValidationErrorPaymentList:
+      description: Query param validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: Invalid payment ID
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 25
+    ValidationErrorCreateTicket:
+      description: Body param validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                description: Return data object
+                type: array
+                items: {}
+              error_message:
+                description: Error message
+                type: string
+                example: User not found
+              error_code:
+                description: Error code
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 25
+    GetOrderList:
+      description: Success order list response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Total count items on current page
+                  list:
+                    type: array
+                    description: List of returned items
+                    items:
+                      type: object
+                      $ref: '#/components/schemas/OrderListItem'
+              pagination:
+                type: object
+                $ref: '#/components/schemas/Pagination'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    GetOrder:
+      description: Success order response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/OrderItem'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    EditLink:
+      description: Success edit order link response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Edited order ID
+                    example: 255
+                  link:
+                    type: string
+                    description: Updated order Link
+                    example: 'https://www.instagram.com/p/CnSqOBDrrCp/?hl=en'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    PullOrders:
+      description: Success pull orders response
+      content:
+        application/json:
+          schema:
+            required:
+              - data
+              - error_message
+              - error_code
+            type: object
+            properties:
+              data:
+                type: object
+                required:
+                  - count
+                  - list
+                properties:
+                  count:
+                    description: Total count items on current page
+                    type: integer
+                    example: 1
+                  list:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - user
+                        - creation_type
+                        - charge
+                        - link
+                        - order_buttons
+                        - quantity
+                        - service_id
+                        - service_type
+                        - service_name
+                        - created
+                        - created_timestamp
+                      properties:
+                        id:
+                          type: integer
+                          description: Order ID
+                          example: 10547
+                        user:
+                          type: string
+                          description: The user who created the order
+                          example: john
+                        creation_type:
+                          type: string
+                          description: Use it to filter orders by their creation type.
+                          example: new_order_form
+                        charge:
+                          type: object
+                          description: Order charge
+                          required:
+                            - value
+                            - currency_code
+                            - formatted
+                          properties:
+                            value:
+                              description: Order charge amount in panel currency
+                              type: string
+                              example: '100'
+                            currency_code:
+                              description: Panel currency code in ISO 4217 for this payment
+                              type: string
+                              example: USD
+                            formatted:
+                              description: Formatted charge with currency symbol
+                              type: string
+                              example: $100.00
+                        link:
+                          type: string
+                          description: Order link
+                          example: 'https://www.instagram.com/p/CnfRmZ-y24E/?hl=en'
+                        order_buttons:
+                          description: >-
+                            Order buttons array. Contains info if additional
+                            data was entered by the user when creating an order
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              title:
+                                description: Button title
+                                type: string
+                                example: Hashtag
+                              service_type:
+                                type: string
+                                example: hashtag
+                              type:
+                                description: Button type
+                                type: string
+                                example: hashtag
+                              user_data:
+                                description: >-
+                                  Additional data that was entered by a user
+                                  when creating the order
+                                type: array
+                                items:
+                                  type: string
+                                  example: example-comment-1
+                        quantity:
+                          type: integer
+                          description: Order quantity
+                          example: 3000
+                        service_id:
+                          type: integer
+                          description: Service ID
+                          example: 455
+                        service_type:
+                          description: Service type
+                          type: string
+                          example: mentions_user_followers
+                        service_name:
+                          description: Service name
+                          type: string
+                          example: Mentions user followers
+                        created:
+                          type: string
+                          description: The date/time of order creation
+                          format: date-time
+                          example: '2021-11-30 14:08:53'
+                        created_timestamp:
+                          description: The date of orders creation in UNIX Timestamp format
+                          type: integer
+                          example: 1447804800
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    Resend:
+      description: Success resend orders response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    description: List of successfully processed order IDs
+                    items:
+                      type: integer
+                      example: 44
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    ChangeStatus:
+      description: Success orders change status response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    description: List of successfully processed order IDs
+                    items:
+                      type: integer
+                      example:
+                        - 12
+                        - 33
+                        - 46
+                  status:
+                    type: string
+                    description: Updated status for the  successfully processed orders
+                    items:
+                      type: string
+                      example: processing
+                  skipped_ids:
+                    type: array
+                    description: List of order IDs that were not processed
+                    items:
+                      type: integer
+                      example:
+                        - 15
+                        - 30
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    SetPartial:
+      description: Success set order partial response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Successfully processed order ID
+                  remains:
+                    type: integer
+                    description: Updated remains for the successfully processed order
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    RequestCancel:
+      description: Success orders request cancel response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    description: >-
+                      List of order IDs for which cancellation requests were
+                      successfully created
+                    items:
+                      type: integer
+                      example:
+                        - 12
+                        - 33
+                        - 46
+                  skipped_ids:
+                    type: array
+                    description: >-
+                      List of order IDs for which cancellation requests were not
+                      created
+                    items:
+                      type: integer
+                      example:
+                        - 15
+                        - 30
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    GetPaymentList:
+      description: Success payment list response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Total count items on current page
+                  list:
+                    type: array
+                    description: List of returned items
+                    items:
+                      type: object
+                      $ref: '#/components/schemas/PaymentListItem'
+                  pagination:
+                    type: object
+                    $ref: '#/components/schemas/Pagination'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    Cancel:
+      description: Success cancel and refund orders response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    description: List of successfully processed order IDs
+                    items:
+                      type: integer
+                      example:
+                        - 12
+                        - 33
+                        - 46
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    AddPayment:
+      description: Success add payment for user
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  payment_id:
+                    type: integer
+                    description: Unique identifier (payment ID) of the payment
+                    example: 10547
+                  user:
+                    type: object
+                    $ref: '#/components/schemas/AddPaymentUserItem'
+                  amount:
+                    type: object
+                    $ref: '#/components/schemas/AddPaymentAmountItem'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    ReplyTicket:
+      description: Reply to a ticket
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ticket_id:
+                    type: integer
+                    description: Ticket ID
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    AddTicket:
+      description: Success add ticket for user
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  ticket_id:
+                    type: integer
+                    description: Ticket ID
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    AddUser:
+      description: Success add user to panel
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                    description: The unique identifier (user ID) of the created user
+                    example: 242
+                  username:
+                    type: string
+                    description: The username of the created user
+                    example: john
+                  user_email:
+                    type: string
+                    format: email
+                    description: The email address of the created user
+                    example: john@test.com
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    GetUserList:
+      description: Success user list response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Total count of items on the current page
+                  list:
+                    type: array
+                    description: List of returned items
+                    items:
+                      type: object
+                      $ref: '#/components/schemas/UserListItem'
+              pagination:
+                type: object
+                $ref: '#/components/schemas/Pagination'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    GetTicketList:
+      description: Success ticket list response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Total count of items on the current page
+                  list:
+                    type: array
+                    description: List of returned items
+                    items:
+                      type: object
+                      $ref: '#/components/schemas/TicketListItem'
+              pagination:
+                type: object
+                $ref: '#/components/schemas/Pagination'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+    GetTicketView:
+      description: Success ticket view response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - error_message
+              - error_code
+            properties:
+              data:
+                type: object
+                required:
+                  - 'id,'
+                  - 'user,'
+                  - 'subject,'
+                  - 'status,'
+                  - 'assignee,'
+                  - 'created,'
+                  - 'created_timestamp,'
+                  - 'last_update,'
+                  - 'last_update_timestamp,'
+                  - 'is_read,'
+                  - 'messages,'
+                  - 'replies,'
+                  - 'staff,'
+                  - 'cdn,'
+                properties:
+                  id:
+                    type: integer
+                    description: Ticket ID
+                    example: 244
+                  user:
+                    type: object
+                    description: Ticket user (the user who sent or received the ticket)
+                    properties:
+                      id:
+                        type: integer
+                        description: User ID
+                        example: 5
+                      username:
+                        type: string
+                        description: Unique username of the user
+                        example: john123
+                  subject:
+                    type: string
+                    description: Ticket subject
+                    example: Testing ticket
+                  status:
+                    type: string
+                    description: Ticket status
+                    enum:
+                      - Pending
+                      - Answered
+                      - Closed
+                      - Locked
+                      - Welcome
+                    example: Pending
+                  assignee:
+                    type: string
+                    description: Ticket assignee
+                    example: admin123
+                  created:
+                    type: string
+                    description: Date and time of ticket creation
+                    example: '2021-11-30 14:08:53'
+                  created_timestamp:
+                    type: integer
+                    description: Date and time of ticket creation in UNIX Timestamp format
+                    example: 1447804800
+                  last_update:
+                    type: string
+                    description: >-
+                      Date and time of the last ticket update (response or
+                      status change)
+                    example: '2021-11-30 14:08:53'
+                  last_update_timestamp:
+                    type: integer
+                    description: >-
+                      Date and time of the last ticket update (response or
+                      status change) in UNIX Timestamp format
+                    example: 1447804800
+                  is_read:
+                    type: boolean
+                    description: >-
+                      Ticket status of whether the ticket has been unread/read
+                      by the staff.
+                    example: true
+                  messages:
+                    type: array
+                    description: Ticket messages array
+                    items:
+                      description: Ticket messages
+                      properties:
+                        message:
+                          type: string
+                          description: Ticket message
+                          example: Hello!
+                        attachments:
+                          type: array
+                          description: >-
+                            Attachments array. Contains info if attachment files
+                            were added to the message by the user.
+                          items:
+                            properties:
+                              name:
+                                type: string
+                                description: File name
+                                example: example_file
+                              size:
+                                type: integer
+                                description: File size
+                                example: 100
+                              url:
+                                type: string
+                                description: File link
+                                example: 'https://files-exapmple.exmpl/file.gif'
+                        created:
+                          type: integer
+                          description: Date and time of message creation
+                          example: '2024-01-01 00:00:01'
+                        created_timestamp:
+                          type: integer
+                          description: >-
+                            Date and time of message creation in UNIX Timestamp
+                            format
+                          example: 1447804800
+                        sender_name:
+                          type: string
+                          description: 'Sender name: staff name or user name'
+                          example: example_user
+                        is_staff:
+                          type: boolean
+                          description: >-
+                            Message sender status indicating if the ticket was
+                            sent by staff or user. Value 'true' is for staff
+                            (admin) and 'false' for user.
+                          example: false
+                        is_unread:
+                          type: boolean
+                          description: >-
+                            Whether or not the user has read the message. Has
+                            the value true if the user has not read the message.
+                          example: true
+              pagination:
+                type: object
+                $ref: '#/components/schemas/Pagination'
+              error_message:
+                description: Error message
+                type: string
+              error_code:
+                description: Error code
+                type: integer
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key

@@ -1,0 +1,268 @@
+.fa-solid.fa-star {
+    color: #ffd739 !important
+}
+
+.fa-regular.fa-star {
+    color: #000 !important
+}
+
+.fa-facebook {
+    color: #0c86ef !important
+}
+
+.fa-twitter {
+    color: #00aced !important
+}
+
+.fa-youtube {
+    color: #ff0000 !important
+}
+
+.fa-bag-shopping {
+    color: #fd5e32 !important
+}
+
+
+.fa-vine {
+    color: #00bf8f !important
+}
+
+.fa-flickr {
+    color: #ff0084 !important
+}
+
+.fa-linkedin {
+    color: #007bb6 !important
+}
+
+.fa-instagram {
+    color: transparent;
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    background: -webkit-radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    background-clip: text;
+    -webkit-background-clip: text;
+}
+
+.fa-google {
+    color: #dd4b39 !important;
+}
+
+.fa-spotify {
+    color: #1ED760 !important
+}
+
+.fa-telegram {
+    color: #229ed9 !important
+}
+
+.fa-twitch {
+    color: #6441a4 !important
+}
+
+.fa-reddit {
+    color: #ff4500 !important
+}
+
+.fa-soundcloud {
+    color: #f70 !important
+}
+
+.fa-tiktok {
+    color: #000  !important;
+    text-shadow: 1px 1px #ff3353fc,-1px -1px cyan
+}
+
+.dark-mode .fa-tiktok {
+    color: #fff !important;
+    text-shadow: 1px 1px #ff3353fc,-1px -1px cyan
+}
+
+.fa-question {
+    color: #000 !important
+}
+
+.dark-mode .fa-question {
+    color: #fff !important
+}
+
+.fa-pinterest {
+    color: #e60023 !important
+}
+
+.fa-vimeo {
+    color: #19b7ea !important
+}
+
+.fa-snapchat {
+    color: #fffc00 !important
+}
+
+.fa-tumblr {
+    color: #36465d !important
+}
+
+.fa-discord {
+    color: #5865f2 !important
+}
+
+.fa-dailymotion {
+    color: #0af !important
+}
+
+.fa-tv {
+    color: #00a1d6 !important
+}
+
+.fa-power-off {
+    color: white !important;
+    background: red  !important;
+}
+
+.alert-announcement p {
+    margin-bottom: 0 !important;
+}
+
+.div-description p, #service-description p {
+    margin-bottom: 0 !important;
+}
+
+.div-description img, #service-description img {
+    width: 100%;
+    height: auto;
+}
+
+.wrap {
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+#table-tickets tr {
+    cursor: pointer;
+}
+
+.span-quantity-discount {
+    cursor: pointer;
+    animation: blink 1.5s linear infinite;
+}
+
+.select2-container--bootstrap5 .select2-dropdown .select2-results__options {
+    max-height: 500px !important;
+}
+
+@keyframes blink{
+    0%{opacity: 0;}
+    50%{opacity: .5;}
+    100%{opacity: 1;}
+}
+
+.summary .card-title {
+    padding-top: 15px;
+}
+
+.summary .ribbon-label {
+    font-size: 10px;
+}
+
+.label-outstock {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+}
+
+.label-stock {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.hover-scroll-overlay-y {
+    overflow-y: overlay !important;
+}
+
+.tab-description-product p {
+    margin-bottom: 0 !important;
+}
+
+.tab-description-product img {
+    width: 100%;
+}
+
+.w-13px {
+    width: 13px !important;
+}
+
+.h-13px {
+    height: 13px !important;
+}
+
+.w-15px {
+    width: 15px !important;
+}
+
+.h-15px {
+    height: 15px !important;
+}
+
+.w-25px {
+    width: 25px !important;
+}
+
+.h-25px {
+    height: 25px !important;
+}
+
+@media (max-width: 992px) {
+    .card-services {
+        transform: scale(0.7);
+        transform-origin: top left;
+        width: calc(100% / 0.7);
+    }
+
+    .card-orders {
+        transform: scale(0.6);
+        transform-origin: top left;
+        width: calc(100% / 0.6);
+    }
+}
+
+@media (max-width: 768px) {
+    .card-services {
+        transform: scale(0.8);
+        transform-origin: top left;
+        width: calc(100% / 0.8);
+    }
+}
+
+@media (max-width: 576px) {
+    .card-services {
+        transform: scale(0.65);
+        transform-origin: top left;
+        width: calc(100% / 0.65);
+    }
+}
+
+@media (max-width: 430px) {
+    .card-services {
+        transform: scale(0.45);
+        transform-origin: top left;
+        width: calc(100% / 0.45);
+    }
+
+    .card-orders {
+        transform: scale(0.6);
+        transform-origin: top left;
+        width: calc(100% / 0.6);
+    }
+}

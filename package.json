@@ -1,0 +1,46 @@
+{
+    "name": "smmpanel-v2",
+    "version": "1.0.0",
+    "description": "SMMPanel V2 - Perfect",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "sass": "sass resources/scss:public/css --watch",
+        "sass:build": "sass resources/scss:public/css --no-source-map"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.24.9",
+        "@babel/preset-env": "^7.24.8",
+        "@tailwindcss/forms": "^0.5.9",
+        "@tailwindcss/postcss": "^4.0.0",
+        "@vitejs/plugin-vue": "^4.5.0",
+        "babel-loader": "^9.1.3",
+        "babel-plugin-prismjs": "^2.1.0",
+        "bootstrap": "^5.3.0",
+        "css-loader": "^7.1.2",
+        "file-loader": "^6.2.0",
+        "glob": "^11.0.0",
+        "html-loader": "^5.0.0",
+        "html-webpack-plugin": "^5.6.0",
+        "mini-css-extract-plugin": "^2.9.0",
+        "postcss": "^8.4.39",
+        "postcss-loader": "^8.1.1",
+        "postcss-preset-env": "^9.6.0",
+        "prettier": "^3.3.3",
+        "prettier-plugin-tailwindcss": "^0.6.11",
+        "sass": "^1.69.5",
+        "style-loader": "^4.0.0",
+        "tailwindcss": "^4.0.0",
+        "vite": "^5.0.8",
+        "webpack": "^5.96.1",
+        "webpack-cli": "^5.1.4",
+        "webpack-dev-server": "^5.0.4"
+    },
+    "dependencies": {
+        "aos": "^2.3.4",
+        "bootstrap-icons": "^1.11.0",
+        "playwright": "^1.59.1",
+        "swiper": "^11.0.0"
+    }
+}

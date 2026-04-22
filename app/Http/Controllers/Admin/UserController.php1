@@ -1,0 +1,500 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     * Handles search, filter, and bulk operations
+     */
+    public function index(Request $request)
+    {
+        // Handle bulk operations
+        if ($request->has('bulk_action') && $request->has('user_ids')) {
+            return $this->handleBulkAction($request);
+        }
+
+        // Build query with search and filters
+        $query = User::where('domain', $request->getHost());
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->status === 'active');
+        }
+
+        // Filter by role
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        // Filter by level
+        if ($request->filled('level')) {
+            $query->where('level', $request->level);
+        }
+
+        // Sort
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
+
+        // Select only needed columns for better performance
+        $users = $query->select('id', 'name', 'email', 'username', 'phone', 'is_active', 'role', 'level', 'balance', 'created_at')
+            ->paginate(15);
+
+        return $request->expectsJson() 
+            ? response()->json(['success' => true, 'data' => $users])
+            : view('adminpanel.accounts.index', compact('users'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        return view('admin.users.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'username' => 'nullable|string|max:255|unique:users',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'required|in:user,admin',
+            'level' => 'nullable|in:retail,agent,distributor',
+            'balance' => 'nullable|numeric|min:0',
+            'is_active' => 'boolean',
+        ]);
+
+        $validated['password'] = bcrypt($validated['password']);
+        $validated['username'] = $validated['username'] ?? str_replace(' ', '_', strtolower($validated['name']));
+        $validated['is_active'] = $request->boolean('is_active');
+        $validated['domain'] = $request->getHost();
+
+        $user = User::create($validated);
+
+        return $request->expectsJson() 
+            ? response()->json(['success' => true, 'message' => 'Tạo thành viên thành công!', 'user' => $user])
+            : redirect()->route('admin.users.index')->with('success', 'Tạo thành viên thành công!');
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(Request $request, User $user)
+    {
+        
+        return $request->expectsJson() 
+            ? response()->json(['success' => true, 'user' => $user])
+            : view('adminpanel.accounts.payment', compact('user'));
+    }
+
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(Request $request, User $user)
+    {
+        
+        return view('admin.users.edit', compact('user'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     * Handles status toggle, quick updates, bulk operations, and form updates
+     */
+    public function update(Request $request, User $user = null)
+    {
+        
+        // Handle bulk operations
+        if ($request->has('bulk_action') && $request->has('user_ids')) {
+            return $this->handleBulkAction($request);
+        }
+
+        // Handle status toggle (from status-switch component)
+        if ($request->has('toggle_status')) {
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy thành viên!'], 404);
+            }
+
+            $status = (bool) $request->input('status', 0);
+            $entityId = $request->input('entity_id', $user->id);
+            
+            // Ensure entityId is not null or empty
+            if (empty($entityId)) {
+                $entityId = $user->id;
+            }
+            
+            if ($user->is_active !== $status) {
+                $user->update(['is_active' => $status]);
+                $message = $status 
+                    ? "Kích hoạt thành viên ID #{$entityId} thành công!" 
+                    : "Vô hiệu hóa thành viên ID #{$entityId} thành công!";
+                
+                \Log::info('User status toggled', [
+                    'user_id' => $user->id,
+                    'entity_id' => $entityId,
+                    'old_status' => !$status,
+                    'new_status' => $status
+                ]);
+            } else {
+                $message = "Trạng thái thành viên ID #{$entityId} không thay đổi!";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'status' => $status,
+                'entity_id' => $entityId,
+                'user' => $user->fresh()
+            ]);
+        }
+
+        // Handle quick field update (from quick-edit component)
+        if ($request->has('field')) {
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy thành viên!'], 404);
+            }
+
+            $field = $request->input('field');
+            $value = $request->input('value');
+
+            // Define allowed fields for quick update
+            $allowedFields = [
+                'is_active' => 'boolean',
+                'role' => ['user', 'admin'],
+                'level' => ['retail', 'agent', 'distributor', null],
+                'balance' => 'numeric'
+            ];
+
+            if (!array_key_exists($field, $allowedFields)) {
+                return response()->json(['success' => false, 'message' => 'Trường không được phép cập nhật!'], 400);
+            }
+
+            $oldValue = $user->{$field};
+            
+            try {
+                switch ($field) {
+                    case 'is_active':
+                        $value = (bool) $value;
+                        break;
+                    case 'role':
+                        if (!in_array($value, $allowedFields[$field])) {
+                            throw new \InvalidArgumentException('Role không hợp lệ!');
+                        }
+                        break;
+                    case 'level':
+                        if ($value !== null && !in_array($value, $allowedFields[$field])) {
+                            throw new \InvalidArgumentException('Level không hợp lệ!');
+                        }
+                        break;
+                    case 'balance':
+                        $value = (float) $value;
+                        if ($value < 0) {
+                            throw new \InvalidArgumentException('Số dư không được âm!');
+                        }
+                        break;
+                }
+
+                if ($oldValue != $value) {
+                    $user->update([$field => $value]);
+                    
+                    \Log::info('User field updated', [
+                        'user_id' => $user->id,
+                        'field' => $field,
+                        'old_value' => $oldValue,
+                        'new_value' => $value
+                    ]);
+                    
+                    $message = 'Cập nhật thành công!';
+                } else {
+                    $message = 'Giá trị không thay đổi!';
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'field' => $field,
+                    'old_value' => $oldValue,
+                    'new_value' => $value,
+                    'user' => $user->fresh()
+                ]);
+
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+            } catch (\Exception $e) {
+                \Log::error('Quick update failed', [
+                    'user_id' => $user->id,
+                    'field' => $field,
+                    'value' => $value,
+                    'error' => $e->getMessage()
+                ]);
+                
+                return response()->json(['success' => false, 'message' => 'Có lỗi xảy ra khi cập nhật!'], 500);
+            }
+        }
+
+        // Handle regular form update
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy thành viên!'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'username' => 'sometimes|nullable|string|max:255|unique:users,username,' . $user->id,
+            'phone' => 'sometimes|nullable|string|max:20',
+            'password' => 'sometimes|nullable|string|min:8|confirmed',
+            'role' => 'sometimes|required|in:user,admin',
+            'level' => 'sometimes|nullable|in:retail,agent,distributor',
+            'balance' => 'sometimes|nullable|numeric|min:0',
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        // Prepare data for update - only include changed fields
+        $updateData = [];
+        $originalUser = $user->getOriginal();
+
+        foreach ($validated as $field => $value) {
+            if ($field === 'password') {
+                if ($request->filled('password')) {
+                    $updateData['password'] = bcrypt($value);
+                }
+                continue;
+            }
+
+            if ($field === 'is_active') {
+                $value = $request->boolean('is_active');
+            }
+
+            if ($originalUser[$field] != $value) {
+                $updateData[$field] = $value;
+            }
+        }
+
+        if (!empty($updateData)) {
+            $user->update($updateData);
+            $message = 'Cập nhật thành viên thành công!';
+            
+            \Log::info('User updated', [
+                'user_id' => $user->id,
+                'updated_fields' => array_keys($updateData),
+                'changes' => $updateData
+            ]);
+        } else {
+            $message = 'Không có thay đổi nào để cập nhật!';
+        }
+
+        return $request->expectsJson() 
+            ? response()->json(['success' => true, 'message' => $message, 'user' => $user->fresh(), 'updated_fields' => array_keys($updateData ?? [])])
+            : redirect()->route('admin.users.index')->with('success', $message);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     * Handles single and bulk delete
+     */
+    public function destroy(Request $request, User $user = null)
+    {
+        
+        // Handle bulk delete
+        if ($request->has('bulk_action') && $request->has('user_ids')) {
+            return $this->handleBulkAction($request);
+        }
+
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy thành viên!'], 404);
+        }
+
+        $userName = $user->name;
+        $user->delete();
+
+        return $request->expectsJson() 
+            ? response()->json(['success' => true, 'message' => "Đã xóa thành viên {$userName} thành công!"])
+            : redirect()->route('admin.users.index')->with('success', "Đã xóa thành viên {$userName} thành công!");
+    }
+
+    /**
+     * Update user balance
+     */
+    public function updateBalance(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric',
+            'type' => 'required|in:add,subtract',
+            'note' => 'nullable|string|max:255'
+        ]);
+
+        $oldBalance = $user->balance;
+        $amount = abs($validated['amount']);
+        
+        if ($validated['type'] === 'add') {
+            $user->balance += $amount;
+        } else {
+            if ($user->balance < $amount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Số dư không đủ để trừ!'
+                ], 400);
+            }
+            $user->balance -= $amount;
+        }
+
+        $user->save();
+
+        // Log the transaction
+        \Log::info('User balance updated', [
+            'user_id' => $user->id,
+            'old_balance' => $oldBalance,
+            'new_balance' => $user->balance,
+            'type' => $validated['type'],
+            'amount' => $amount,
+            'note' => $validated['note'] ?? null
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['type'] === 'add' 
+                ? "Cộng ${amount} thành công!" 
+                : "Trừ ${amount} thành công!",
+            'old_balance' => $oldBalance,
+            'new_balance' => $user->balance,
+            'user' => $user->fresh()
+        ]);
+    }
+
+    /**
+     * Handle bulk actions (private method)
+     */
+    private function handleBulkAction(Request $request)
+    {
+        $validated = $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+            'bulk_action' => 'required|string|in:activate,deactivate,delete,update_role,update_level',
+            'bulk_data' => 'sometimes|array'
+        ]);
+
+        $userIds = $validated['user_ids'];
+        $action = $validated['bulk_action'];
+        $bulkData = $validated['bulk_data'] ?? [];
+
+        try {
+            $updatedCount = 0;
+            $processedIds = [];
+
+            switch ($action) {
+                case 'activate':
+                    // Get users that actually need to be updated (not already active)
+                    $usersToUpdate = User::whereIn('id', $userIds)->where('is_active', false)->pluck('id')->toArray();
+                    if (!empty($usersToUpdate)) {
+                        $updatedCount = User::whereIn('id', $usersToUpdate)->update(['is_active' => true]);
+                        $processedIds = $usersToUpdate;
+                    }
+                    $idsText = !empty($processedIds) ? ' (ID: ' . implode(', ', $processedIds) . ')' : '';
+                    $message = "Đã kích hoạt {$updatedCount} thành viên{$idsText}";
+                    break;
+
+                case 'deactivate':
+                    // Get users that actually need to be updated (not already inactive)
+                    $usersToUpdate = User::whereIn('id', $userIds)->where('is_active', true)->pluck('id')->toArray();
+                    if (!empty($usersToUpdate)) {
+                        $updatedCount = User::whereIn('id', $usersToUpdate)->update(['is_active' => false]);
+                        $processedIds = $usersToUpdate;
+                    }
+                    $idsText = !empty($processedIds) ? ' (ID: ' . implode(', ', $processedIds) . ')' : '';
+                    $message = "Đã vô hiệu hóa {$updatedCount} thành viên{$idsText}";
+                    break;
+
+                case 'delete':
+                    $processedIds = $userIds; // All selected IDs will be deleted
+                    $updatedCount = User::whereIn('id', $userIds)->delete();
+                    $idsText = !empty($processedIds) ? ' (ID: ' . implode(', ', $processedIds) . ')' : '';
+                    $message = "Đã xóa {$updatedCount} thành viên{$idsText}";
+                    break;
+
+                case 'update_role':
+                    if (!isset($bulkData['role']) || !in_array($bulkData['role'], ['user', 'admin'])) {
+                        throw new \Exception('Role không hợp lệ');
+                    }
+                    // Get users that actually need role update
+                    $usersToUpdate = User::whereIn('id', $userIds)->where('role', '!=', $bulkData['role'])->pluck('id')->toArray();
+                    if (!empty($usersToUpdate)) {
+                        $updatedCount = User::whereIn('id', $usersToUpdate)->update(['role' => $bulkData['role']]);
+                        $processedIds = $usersToUpdate;
+                    }
+                    $idsText = !empty($processedIds) ? ' (ID: ' . implode(', ', $processedIds) . ')' : '';
+                    $message = "Đã cập nhật role cho {$updatedCount} thành viên{$idsText}";
+                    break;
+
+                case 'update_level':
+                    if (!isset($bulkData['level']) || !in_array($bulkData['level'], ['retail', 'agent', 'distributor'])) {
+                        throw new \Exception('Level không hợp lệ');
+                    }
+                    // Get users that actually need level update
+                    $usersToUpdate = User::whereIn('id', $userIds)->where('level', '!=', $bulkData['level'])->pluck('id')->toArray();
+                    if (!empty($usersToUpdate)) {
+                        $updatedCount = User::whereIn('id', $usersToUpdate)->update(['level' => $bulkData['level']]);
+                        $processedIds = $usersToUpdate;
+                    }
+                    $idsText = !empty($processedIds) ? ' (ID: ' . implode(', ', $processedIds) . ')' : '';
+                    $message = "Đã cập nhật level cho {$updatedCount} thành viên{$idsText}";
+                    break;
+
+                default:
+                    throw new \Exception('Hành động không hợp lệ');
+            }
+
+            // Log the bulk action with detailed information
+            \Log::info('User bulk action completed', [
+                'action' => $action,
+                'requested_ids' => $userIds,
+                'processed_ids' => $processedIds,
+                'updated_count' => $updatedCount,
+                'bulk_data' => $bulkData
+            ]);
+
+            return $request->expectsJson() 
+                ? response()->json([
+                    'success' => true, 
+                    'message' => $message, 
+                    'updated_count' => $updatedCount,
+                    'processed_ids' => $processedIds
+                ])
+                : redirect()->route('admin.users.index')->with('success', $message);
+
+        } catch (\Exception $e) {
+            \Log::error('User bulk action failed', [
+                'action' => $action,
+                'user_ids' => $userIds,
+                'error' => $e->getMessage()
+            ]);
+
+            return $request->expectsJson() 
+                ? response()->json(['success' => false, 'message' => $e->getMessage()], 500)
+                : redirect()->route('admin.users.index')->with('error', $e->getMessage());
+        }
+    }
+}

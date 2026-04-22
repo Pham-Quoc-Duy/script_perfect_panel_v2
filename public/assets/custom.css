@@ -1,0 +1,33 @@
+/* ===== REPORT BUTTON STYLE ===== */
+button.btn-danger.hover-scale.fs-9[data-lang] {
+  background: linear-gradient(135deg, #ff3b3b, #ff6b6b);
+  border: none;
+  color: #fff;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  padding: 4px 10px;
+  border-radius: 8px;
+
+  box-shadow: 0 6px 14px rgba(255, 59, 59, 0.25);
+  transition: all 0.25s ease;
+}
+
+/* Hover */
+button.btn-danger.hover-scale.fs-9[data-lang]:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 22px rgba(255, 59, 59, 0.35);
+}
+
+/* Click effect */
+button.btn-danger.hover-scale.fs-9[data-lang]:active {
+  transform: scale(0.96);
+  box-shadow: 0 4px 10px rgba(255, 59, 59, 0.2);
+}
+
+/* Optional: icon spacing náº¿u báº¡n thĂªm icon sau nĂ y */
+button.btn-danger.hover-scale.fs-9 i {
+  margin-right: 4px;
+  font-size: 11px;
+}
